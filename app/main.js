@@ -46,35 +46,6 @@ function getCarbonIntensityData(postcode, plottingFcn) {
   var today = new Date();
   datestr = today.toISOString()
 
-  // var names = ['region forecast',
-  //   'national forecast',
-  //   'region historic',
-  //   'national historic']
-
-  // Promise.all([
-  //   fetch("https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/fw48h/postcode/" + postcode),
-  //   fetch("https://api.carbonintensity.org.uk/intensity/" + datestr + "/fw48h"),
-  //   fetch("https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/pt24h/postcode/" + postcode),
-  //   fetch("https://api.carbonintensity.org.uk/intensity/" + datestr + "/pt24h"),
-  // ]).then(function (responses) {
-  //   // Get a JSON object from each of the responses
-  //   return Promise.all(responses.map(function (response) {
-  //     return response.json();
-  //   }));
-  // }).then((data) => {
-  //   console.log(data);
-  //   var stand_data = data.map(standardiseCarbonForecast);
-  //   console.log(stand_data);
-
-
-  //   processForcast(stand_data, plottingFcn);
-  //   // join all time time series to single dict
-  // }).catch(function (error) {
-  //   // if there's an error, log it
-  //   console.log(error);
-  // });
-
-
   var urls = [['region forecast', "https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/fw48h/postcode/" + postcode],
   ['national forecast', "https://api.carbonintensity.org.uk/intensity/" + datestr + "/fw48h"],
   ['region historic', "https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/pt24h/postcode/" + postcode],
@@ -88,13 +59,12 @@ function getCarbonIntensityData(postcode, plottingFcn) {
         }
         return res.json();
       })
-      .then(data => { 
+      .then(data => {
         var stanData = standardiseCarbonForecast(data, seriesName = url[0])
         var traces = createTraces(stanData)
         addToPlot(traces)
       })
       .catch(err => { throw err });
-
   })
 }
 
@@ -123,20 +93,10 @@ function standardiseCarbonForecast(data, seriesName = 'intensity') {
 function getForecast(postcode, plottingFcn, source = 'carbon_intensity') {
   if (source == 'carbon_intensity') {
     return getCarbonIntensityData(postcode, plottingFcn)
-    // return getCarbonIntensityForecast(postcode, plottingFcn)
   }
 }
 
 function processForcast(data, plottingFcn) {
-  // data = [{date, value}]
-  // try {
-  //   var traces = createTraces(data)
-  // } catch (error) {
-  //   var traces = []
-  //   data.forEach(function (time_series) {
-  //     traces.push(createTraces(time_series))
-  //   })
-  // }
   var traces = []
   data.forEach(function (time_series) {
     traces = traces.concat(createTraces(time_series))

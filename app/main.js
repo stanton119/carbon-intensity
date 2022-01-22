@@ -4,6 +4,7 @@ function submitPostcode(plottingFcn = adjustPlot) {
   // document.getElementById("postcodeInput").value = postCode
   updatePageURL(postCode)
 
+  resetPlot()
   getForecast(postCode, plottingFcn)
 }
 
@@ -41,14 +42,79 @@ function getCarbonIntensityForecast(postcode, plottingFcn) {
     .catch(err => { throw err });
 }
 
-function standardiseCarbonForecast(data) {
-  // get output format of {date, carbon intensity}
+function getCarbonIntensityData(postcode, plottingFcn) {
+  var today = new Date();
+  datestr = today.toISOString()
+
+  // var names = ['region forecast',
+  //   'national forecast',
+  //   'region historic',
+  //   'national historic']
+
+  // Promise.all([
+  //   fetch("https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/fw48h/postcode/" + postcode),
+  //   fetch("https://api.carbonintensity.org.uk/intensity/" + datestr + "/fw48h"),
+  //   fetch("https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/pt24h/postcode/" + postcode),
+  //   fetch("https://api.carbonintensity.org.uk/intensity/" + datestr + "/pt24h"),
+  // ]).then(function (responses) {
+  //   // Get a JSON object from each of the responses
+  //   return Promise.all(responses.map(function (response) {
+  //     return response.json();
+  //   }));
+  // }).then((data) => {
+  //   console.log(data);
+  //   var stand_data = data.map(standardiseCarbonForecast);
+  //   console.log(stand_data);
+
+
+  //   processForcast(stand_data, plottingFcn);
+  //   // join all time time series to single dict
+  // }).catch(function (error) {
+  //   // if there's an error, log it
+  //   console.log(error);
+  // });
+
+
+  var urls = [['region forecast', "https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/fw48h/postcode/" + postcode],
+  ['national forecast', "https://api.carbonintensity.org.uk/intensity/" + datestr + "/fw48h"],
+  ['region historic', "https://api.carbonintensity.org.uk/regional/intensity/" + datestr + "/pt24h/postcode/" + postcode],
+  ['national historic', "https://api.carbonintensity.org.uk/intensity/" + datestr + "/pt24h"]]
+
+  urls.forEach(function (url) {
+    fetch(url[1])
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return res.json();
+      })
+      .then(data => { 
+        var stanData = standardiseCarbonForecast(data, seriesName = url[0])
+        var traces = createTraces(stanData)
+        addToPlot(traces)
+      })
+      .catch(err => { throw err });
+
+  })
+}
+
+
+
+
+function standardiseCarbonForecast(data, seriesName = 'intensity') {
+  // get output format of {date:, intensity:}
   var outputData = []
-  data['data']['data'].forEach(function (element) {
+
+  if ('data' in data['data']) {
+    data = data['data']['data']
+  } else {
+    data = data['data']
+  }
+
+  data.forEach(function (element) {
     var date = new Date(element['from'])
     var intensity = element['intensity']['forecast']
-    outputData.push({ date: date, intensity: intensity })
-
+    outputData.push({ date: date, [seriesName]: intensity })
   })
   return outputData
 }
@@ -56,13 +122,25 @@ function standardiseCarbonForecast(data) {
 
 function getForecast(postcode, plottingFcn, source = 'carbon_intensity') {
   if (source == 'carbon_intensity') {
-    return getCarbonIntensityForecast(postcode, plottingFcn)
+    return getCarbonIntensityData(postcode, plottingFcn)
+    // return getCarbonIntensityForecast(postcode, plottingFcn)
   }
 }
 
 function processForcast(data, plottingFcn) {
   // data = [{date, value}]
-  var traces = createTraces(data)
+  // try {
+  //   var traces = createTraces(data)
+  // } catch (error) {
+  //   var traces = []
+  //   data.forEach(function (time_series) {
+  //     traces.push(createTraces(time_series))
+  //   })
+  // }
+  var traces = []
+  data.forEach(function (time_series) {
+    traces = traces.concat(createTraces(time_series))
+  })
   plottingFcn(traces)
 }
 
@@ -101,14 +179,11 @@ function createTrace(x, y, name, visible = true) {
 }
 
 function createPlot(traces) {
-  var xrangemin = new Date;
-  var xrangemax = new Date(xrangemin.getTime()).setDate(xrangemin.getDate() + 3);
   var layout = {
     title: plotTitle,
     height: 800,
-    xaxis: {
-      range: [xrangemin, xrangemax],
-      rangeslider: {}
+    yaxis: {
+      range: [0, 600],
     },
     legend: {
       x: 0
@@ -130,6 +205,21 @@ function adjustPlot(traces) {
   Plotly.redraw(plotDiv);
 }
 
+function addToPlot(traces) {
+  traces.forEach(trace => {
+    plotData.push(trace)
+  });
+  try {
+    Plotly.redraw(plotDiv);
+  } catch (error) {
+    createPlot(traces);
+  }
+}
+
+function resetPlot() {
+  plotData.length = 0
+}
+
 function findGetParameter(parameterName) {
   // https://stackoverflow.com/questions/5448545/how-to-retrieve-get-parameters-from-javascript
   var result = null,
@@ -149,7 +239,6 @@ function updatePageURL(postCode) {
   var page = path.split("/").pop();
 
   history.pushState({}, null, page + "?postcode=" + postCode)
-
 }
 
 function defaultSetup() {
